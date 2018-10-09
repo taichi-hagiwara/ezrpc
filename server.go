@@ -22,6 +22,7 @@ type Server interface {
 // ClientInfo は、クライアントの情報を表す。
 type ClientInfo struct {
 	TLSSubject pkix.Name
+	Remote     IPEndPoint
 }
 
 type server struct {
@@ -54,8 +55,11 @@ func (h *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	epName := strings.TrimPrefix(r.URL.Path, "/")
 
+	remote, _ := ParseIPEndPoint(r.RemoteAddr)
+
 	ci := &ClientInfo{
 		TLSSubject: r.TLS.PeerCertificates[0].Subject,
+		Remote:     remote,
 	}
 
 	if ep, ok := h.endpoints[epName]; ok {
