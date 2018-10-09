@@ -24,3 +24,9 @@ func (r *ServiceRegistry) Register(name string, args, result interface{}) {
 		Result: reflect.TypeOf(result).Elem(),
 	}
 }
+
+func newServiceRegistry() *ServiceRegistry {
+	return &ServiceRegistry{
+		endpoints: make(map[string]*endpointType),
+	}
+}

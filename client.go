@@ -22,9 +22,7 @@ type Client struct {
 
 // NewClient は、クライアントを作成する。
 func NewClient(s Service, address, serverName string, cert *CertInfo) (*Client, error) {
-	registry := &ServiceRegistry{
-		endpoints: make(map[string]*endpointType),
-	}
+	registry := newServiceRegistry()
 
 	err := s.Init(registry)
 	if err != nil {
