@@ -64,14 +64,23 @@ func (c *Client) Invoke(name string, args interface{}) (interface{}, error) {
 		return nil, errors.Errorf("unknown endpoint: %s", name)
 	}
 
-	b, err := json.Marshal(args)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal args")
-	}
+	var req *http.Request
+	if args == nil {
+		var err error
+		req, err = http.NewRequest("GET", fmt.Sprintf("https://%s/%s", c.address, name), nil)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create request")
+		}
+	} else {
+		b, err := json.Marshal(args)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to marshal args")
+		}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/%s", c.address, name), bytes.NewReader(b))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create request")
+		req, err = http.NewRequest("POST", fmt.Sprintf("https://%s/%s", c.address, name), bytes.NewReader(b))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create request")
+		}
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -79,12 +88,22 @@ func (c *Client) Invoke(name string, args interface{}) (interface{}, error) {
 		return nil, errors.Wrap(err, "http error")
 	}
 
-	b, err = ioutil.ReadAll(resp.Body)
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read response body")
 	}
 
-	if resp.StatusCode != 200 {
+	switch resp.StatusCode {
+	case http.StatusOK:
+		result := reflect.New(ep.Result).Interface()
+		if err := json.Unmarshal(b, result); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal json")
+		}
+
+		return result, nil
+	case http.StatusNoContent:
+		return nil, nil
+	default:
 		serverError := &ServerError{}
 		if err := json.Unmarshal(b, serverError); err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal error json")
@@ -92,11 +111,4 @@ func (c *Client) Invoke(name string, args interface{}) (interface{}, error) {
 
 		return nil, errors.Wrap(serverError, "server error")
 	}
-
-	result := reflect.New(ep.Result).Interface()
-	if err := json.Unmarshal(b, result); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal json")
-	}
-
-	return result, nil
 }

@@ -111,7 +111,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 
-	if r.Method != "POST" {
+	if r.Method != "POST" && r.Method != "GET" {
 		panic(&ServerError{StatusCode: 405})
 	}
 
@@ -125,15 +125,18 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if ep, ok := h.endpoints[epName]; ok {
-		args := reflect.New(ep.Args).Interface()
+		var args interface{}
+		if r.Method == "POST" {
+			args = reflect.New(ep.Args).Interface()
 
-		b, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			panic(err)
-		}
+			b, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				panic(err)
+			}
 
-		if err := json.Unmarshal(b, args); err != nil {
-			panic(err)
+			if err := json.Unmarshal(b, args); err != nil {
+				panic(err)
+			}
 		}
 
 		result, err := h.handlers[epName](ci, args)
@@ -141,12 +144,16 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 
-		b, err = json.Marshal(result)
-		if err != nil {
-			panic(err)
-		}
+		if result == nil {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			b, err := json.Marshal(result)
+			if err != nil {
+				panic(err)
+			}
 
-		w.Write(b)
+			w.Write(b)
+		}
 	} else {
 		panic(&ServerError{StatusCode: 404})
 	}
